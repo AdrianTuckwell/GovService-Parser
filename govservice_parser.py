@@ -16,31 +16,36 @@ def load_integrations(integration_file):
         raise RuntimeError(f"Failed to load integrations from CSV: {str(e)}")
     return integrations
 
-def extract_process_stages_and_integrations(json_data, integration_mapping):
-    processes = []
-
+def extract_process_stages(json_data):
     try:
         if "processName" in json_data:
             process_name = json_data["processName"]
             stages_dict = json_data.get("stages", {})
             stages = []
-            for index, (stage_id, stage_info) in enumerate(stages_dict.items()):
+            for stage_id, stage_info in stages_dict.items():
                 stage_name = stage_info.get("name", "Unnamed Stage")
-                integrations = stage_info.get("props", {}).get("integrations", [])
-                integration_details = []
-                for integration in integrations:
-                    integration_id = integration.get("id", "Unknown ID")
-                    integration_name = integration_mapping.get(integration_id, integration_id)
-                    integration_details.append(integration_name)
-                stages.append((stage_name, integration_details))
-            processes.append((process_name, stages))
+                stages.append((stage_name, stage_info))
+            return process_name, stages
+    except Exception as e:
+        raise RuntimeError(f"An unexpected error occurred during extraction of stages: {str(e)}")
+
+def extract_process_integrations(process_name, stages, integration_mapping):
+    try:
+        processes = []
+        for stage_name, stage_info in stages:
+            integrations = stage_info.get("props", {}).get("integrations", [])
+            integration_details = []
+            for integration in integrations:
+                integration_id = integration.get("id", "Unknown ID")
+                integration_name = integration_mapping.get(integration_id, integration_id)
+                integration_details.append(integration_name)
+            processes.append((stage_name, integration_details))
+        return process_name, processes
     except Exception as e:
         raise RuntimeError(f"An unexpected error occurred during extraction: {str(e)}")
-    
-    return processes
 
 def generate_xml(data):
-    process_name, stages = data[0]
+    process_name, stages = data
 
     process_elem = ET.Element("Process")
     process_elem.text = process_name
@@ -72,9 +77,9 @@ def main(input_file, integration_file, output_file):
         with open(input_file, 'r') as f:
             json_data = json.load(f)
 
+        process_name, stages = extract_process_stages(json_data)
         integration_mapping = load_integrations(integration_file)
-
-        processes = extract_process_stages_and_integrations(json_data, integration_mapping)
+        processes = extract_process_integrations(process_name, stages, integration_mapping)
 
         xml_tree = generate_xml(processes)
 
