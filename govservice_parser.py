@@ -24,7 +24,8 @@ def extract_process_stages(json_data):
             stages = []
             for stage_id, stage_info in stages_dict.items():
                 stage_name = stage_info.get("name", "Unnamed Stage")
-                stages.append((stage_name, stage_info))
+                form_name = stage_info.get("props", {}).get("formDefinition", {}).get("formName", "Unknown Form")
+                stages.append((stage_name, stage_info, form_name))
             return process_name, stages
     except Exception as e:
         raise RuntimeError(f"An unexpected error occurred during extraction of stages: {str(e)}")
@@ -32,14 +33,14 @@ def extract_process_stages(json_data):
 def extract_process_integrations(process_name, stages, integration_mapping):
     try:
         processes = []
-        for stage_name, stage_info in stages:
+        for stage_name, stage_info, form_name in stages:
             integrations = stage_info.get("props", {}).get("integrations", [])
             integration_details = []
             for integration in integrations:
                 integration_id = integration.get("id", "Unknown ID")
                 integration_name = integration_mapping.get(integration_id, integration_id)
                 integration_details.append(integration_name)
-            processes.append((stage_name, integration_details))
+            processes.append((stage_name, integration_details, form_name))
         return process_name, processes
     except Exception as e:
         raise RuntimeError(f"An unexpected error occurred during extraction: {str(e)}")
@@ -52,9 +53,12 @@ def generate_xml(data):
 
     stages_elem = ET.SubElement(process_elem, "Stages")
 
-    for stage_name, integration_details in stages:
+    for stage_name, integration_details, form_name in stages:
         stage_elem = ET.SubElement(stages_elem, "Stage")
         stage_elem.text = stage_name
+
+        form_elem = ET.SubElement(stage_elem, "FormName")
+        form_elem.text = form_name
 
         integrations_elem = ET.SubElement(stage_elem, "Integrations")
 
